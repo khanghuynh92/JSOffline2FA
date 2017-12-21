@@ -19,31 +19,54 @@
 			body {
 				margin-bottom: 6em;
 			}
-			.footer {
-				position: absolute;
-				bottom: 3em;
-				width: 100%;
-				height: 3em;
+			.header {
+				margin-top: 15px;
 				line-height: 1em;
 			}
 		</style>
-		
+
 		<script>
 			$(document).ready (function(){
 				$(".alert").hide();
 			});
 
 			function onload(){
-				codes = JSON.parse(localStorage.getItem("allCodes"));
-				if(codes !== null){
-					$.each(codes, function(i,v){
-						addKeyHTML(v["name"], v["secret"]);
-					});
+				var query = getQueryParams(document.location.search);
+				if (query.data) {
+					codes = JSON.parse(query.data);
+					if(codes !== null){
+						$.each(codes, function(i,v){
+							addKeyHTML(v["name"], v["secret"], true);
+						});
+					}
+				} else {
+					codes = JSON.parse(localStorage.getItem("allCodes"));
+					if(codes !== null){
+						$.each(codes, function(i,v){
+							addKeyHTML(v["name"], v["secret"]);
+						});
+					}
 				}
+
+
 				$(function(){$('[data-toggle="tooltip"]').tooltip();});
 				setInterval(refresh, 100);
 			}
-			
+
+			function getQueryParams(qs) {
+			    qs = qs.split('+').join(' ');
+
+			    var params = {},
+			        tokens,
+			        re = /[?&]?([^=]+)=([^&]*)/g;
+
+			    while (tokens = re.exec(qs)) {
+			        params[decodeURIComponent(tokens[1])] = decodeURIComponent(tokens[2]);
+			    }
+
+			    return params;
+			}
+
 			// Given a secret key "K" and a timestamp "t" (in 30s units since the
 			// beginning of the epoch), return a TOTP code.
 			function totp(K,t){
@@ -73,7 +96,7 @@
 				var s=sha1(k.concat(sha1(l.concat([0,t])))),o=s[4]&0xF;
 				return ((s[o>>2]<<8*(o&3)|(o&3?s[(o>>2)+1]>>>8*(4-o&3):0))&-1>>>1)%1000000;
 			}
-			
+
 			var lastepochseconds;
 			var lasttimestamp;
 
@@ -81,7 +104,7 @@
 				var e = Math.floor(new Date().getTime()/1000);
 				var t = Math.floor(e/30);
 				var en = new Date().getTime()/1000;
-				
+
 				var rem = 30-(en-(t*30));
 				var percent = (rem/30)*100;
 				$(".progress-bar").width(percent+"%");
@@ -94,7 +117,7 @@
 					lastepochseconds = e;
 					lasttimestamp = t;
 
-					$("#authenticator-group").find("tr").each(function(){
+					$("#authenticator-group tbody").find("tr").each(function(){
 						var secret = $(this).data("key");
 						if(!(secret == null || secret == "")){
 							$(this).find(".code-field").html(addNBSP(runTOTP(secret)));
@@ -102,7 +125,7 @@
 					});
 				}
 			}
-			
+
 			function runTOTP(k){
 				var e = Math.floor(new Date().getTime()/1000);
 				var t = Math.floor(e/30);
@@ -114,17 +137,17 @@
 				}
 				return code;
 			}
-			
+
 			function addNBSP(c){
 				return c.substring(0, 3) + "&nbsp;" + c.substring(3, 6);
 			}
-			
+
 			function addKey(){
 				var name = $("#name").val()
 				var secret = $("#secret").val();
 				addKeyHTML(name, secret);
 			}
-			
+
 			function copyCode(e){
 				var textArea = document.createElement("textarea");
 				textArea.style.position = 'fixed';
@@ -138,7 +161,7 @@
 				textArea.style.boxShadow = 'none';
 				textArea.style.background = 'transparent';
 				textArea.style.resize = 'none';
-				
+
 				textArea.value = runTOTP($(e).data("key"));
 				document.body.appendChild(textArea);
 				textArea.select();
@@ -147,30 +170,30 @@
 					$(".alert").alert();
 					$(".alert-text").text("Copy Successful!");
 					$(".alert").fadeTo(3000, 500).slideUp(500, function(){$(".alert").slideUp(500);});
-				} 
+				}
 				catch(err){console.log(err);}
 			}
-			
-			function addKeyHTML(name, secret){
+
+			function addKeyHTML(name, secret, isImport){
 				if(!alreadyInTable(name, secret)){
-					$("#authenticator-group").append("<tr data-toggle='tooltip' title='Click to copy' data-name='"+name+"' data-key='"+secret+"' onclick='copyCode(this)'><td>"+name+"</td><td class='code-field'>"+addNBSP(runTOTP(secret))+"</td></tr>");
+					$("#authenticator-group tbody").append("<tr data-toggle='tooltip' title='Click to copy' data-name='"+name+"' data-key='"+secret+"' onclick='copyCode(this)'><td>"+name+"</td><td class='code-field'>"+addNBSP(runTOTP(secret))+"</td></tr>");
 				}
-				if(!alreadyInStorage(name, secret)){
+				if(!isImport && !alreadyInStorage(name, secret)){
 					addToStorage(name, secret);
 				}
 				$(function(){$('[data-toggle="tooltip"]').tooltip();});
 			}
-			
+
 			function alreadyInTable(name, secret){
 				var returner = false;
-				$("#authenticator-group").find("tr").each(function(){
+				$("#authenticator-group tbody").find("tr").each(function(){
 					if(secret == $(this).data("key")){
 						returner = true;
 					}
 				});
 				return returner;
 			}
-			
+
 			function alreadyInStorage(name, secret){
 				codes = JSON.parse(localStorage.getItem("allCodes"));
 				if(codes == null){
@@ -184,7 +207,7 @@
 				});
 				return returner;
 			}
-			
+
 			function addToStorage(name, secret){
 				var codes = JSON.parse(localStorage.getItem("allCodes"));
 				if(codes == null){
@@ -193,12 +216,12 @@
 				codes.push({"secret":secret, "name":name});
 				localStorage.setItem("allCodes", JSON.stringify(codes));
 			}
-			
+
 			function exportCode(){
 				$("#import-export").val(localStorage.getItem("allCodes"));
 				$("#import-export").select();
 			}
-			
+
 			function importCode(){
 				try{
 					var codes = JSON.parse($("#import-export").val());
@@ -211,7 +234,7 @@
 					console.log(e);
 				}
 			}
-			
+
 			function qrCallback(a){
 				if(a.indexOf("error decoding QR") > -1){
 					alert("Could not decode QR code, sorry");
@@ -226,7 +249,7 @@
 				var secret = findSecret.exec(a)[1];
 				addKeyHTML(name, secret);
 			}
-			
+
 			function handleFiles(f){
 				for(var i =0;i<f.length;i++){
 					var reader = new FileReader();
@@ -235,21 +258,23 @@
 							qrcode.decode(e.target.result);
 						};
 					})(f[i]);
-					reader.readAsDataURL(f[i]);	
+					reader.readAsDataURL(f[i]);
 				}
 			}
-			
-			qrcode.callback = qrCallback;
+
+			// qrcode.callback = qrCallback;
 		</script>
 	</head>
 	<body onpageshow="onload()">
-		<div class="container-fluid">
-			<div class="alert alert-success alert-dismissible" role="alert">
-				<button type="button" class="close" data-dismiss="alert" aria-label="Close">
-					<span aria-hidden="true">&times;</span>
-				</button>
-				<div class="alert-text"></div>
+		<header class="header">
+			<div class="container-fluid">
+				<h1 class="display-5 d-flex justify-content-center" id="countdown">30</h1>
+				<!-- <div class="progress">
+					<div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="height:1em"></div>
+				</div> -->
 			</div>
+		</header>
+		<div class="container-fluid">
 			<div class="row">
 				<div class="col-md-4 mt-5">
 					<h1 class="display-4">Offline 2FA</h1>
@@ -258,9 +283,9 @@
 						<input type="text" placeholder="Enter Secret Key"  id="secret" class="form-control mb-2 mr-sm-2 mb-sm-0"></input>
 						<button type="submit" class="btn btn-success">Add</button>
 					</form>
-					<h4 class="pt-5">QR Code Entry</h4>
-					<input type="file" onchange="handleFiles(this.files)">
-					<div id="result"></div>
+					<!-- <h4 class="pt-5">QR Code Entry</h4>
+					<input type="file" onchange="handleFiles(this.files)"> -->
+					<!-- <div id="result"></div> -->
 					<h4 class="pt-5">Import/Export</h1>
 					<div class="form-group form-inline">
 						<input type="text" placeholder="" id="import-export" class="form-control mb-2 mr-sm-2 mb-sm-0"></input>
@@ -269,25 +294,27 @@
 					</div>
 				</div>
 				<div class="col-md-8 mt-5">
-					<table class="table" id="authenticator-group">
-						<thead>
-							<tr>
-								<th>Site</th>
-								<th>Code</th>
-							</tr>
-						</thead>
-					</table>
+					<div class="table-responsive">
+						<table class="table table-striped" id="authenticator-group">
+							<thead>
+								<tr>
+									<th>Name</th>
+									<th>Code</th>
+								</tr>
+							</thead>
+							<tbody>
+							</tbody>
+						</table>
+					</div>
 				</div>
+			</div>
+			<div class="alert alert-success alert-dismissible" role="alert">
+				<button type="button" class="close" data-dismiss="alert" aria-label="Close">
+					<span aria-hidden="true">&times;</span>
+				</button>
+				<div class="alert-text"></div>
 			</div>
 		</div>
-		<footer class="footer">
-			<div class="container-fluid">
-				<h1 class="display-5 d-flex justify-content-center" id="countdown">30</h1>
-				<div class="progress">
-					<div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="height:1em"></div>
-				</div>
-			</div>
-		</footer>
 		<script>
 		if ('serviceWorker' in navigator) {
 			window.addEventListener('load', function() {
